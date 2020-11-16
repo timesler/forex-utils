@@ -2,6 +2,7 @@ import torch
 from torch import nn
 from torch._six import container_abcs
 import numpy as np
+import pandas as pd
 
 
 __all__ = ['Collate', 'ts_tensor', 'Change', 'ChangeEncode', 'TPSLEncode']
