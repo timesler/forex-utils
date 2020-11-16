@@ -1,39 +1,42 @@
 import torch
 from torch import nn
+from torch._six import container_abcs
 import numpy as np
 
 
-__all__ = ['collate_fn', 'ts_tensor', 'TSModel', 'Change', 'ChangeEncode', 'TPSLEncode']
+__all__ = ['Collate', 'ts_tensor', 'Change', 'ChangeEncode', 'TPSLEncode']
 
 
-def collate_fn(batch):
-    x, y, xindex, yindex = [], [], [], []
-    for xi, yi in batch:
-        x.append(xi.values.T)
-        y.append(yi.values.T)
-        xindex.append(xi.index)
-        yindex.append(yi.index)
-    x, y = np.array(x), np.array(y)
+class Collate:
+    
+    def __init__(self, flatten=False):
+        self.flatten = nn.Flatten() if flatten else nn.Identity()
 
-    x = ts_tensor(x, xindex)
-    y = ts_tensor(y, yindex)
+    def __call__(self, batch):
+        elem = batch[0]
+        
+        if isinstance(elem, torch.Tensor):
+            return self.flatten(torch.stack(batch))
+        
+        if isinstance(elem, pd.DataFrame):
+            return self([torch.as_tensor(b.values.T) for b in batch])
+        
+        elif isinstance(elem, container_abcs.Sequence):
+            # check to make sure that the elements in batch have consistent size
+            it = iter(batch)
+            elem_size = len(next(it))
+            if not all(len(elem) == elem_size for elem in it):
+                raise RuntimeError('each element in batch should be of equal size')
+            transposed = zip(*batch)
+            return [self(samples) for samples in transposed]
 
-    return x, y
+        raise TypeError(f'Could not collate batch of type {type(elem)}')
 
 
 def ts_tensor(arr, index):
     t = torch.as_tensor(arr).float()
     t.index = index
     return t
-
-
-class TSModel(nn.Module):
-
-    def __init__(self, model):
-        self.model = model
-    
-    def __call__(self, x):
-        return self.model(x.data)
 
 
 class Change:
@@ -71,7 +74,7 @@ class TPSLEncode:
     
     def __call__(self, x):
         change = x - x.iloc[0]
-        return change.apply(self.apply, result_type='broadcast').iloc[[0]]
+        return change.apply(self.apply, result_type='broadcast').iloc[[0]].astype(int)
     
     def apply(self, change):
         buy_tp = min(np.where(change - self.spread > self.tp)[0], default=len(change))

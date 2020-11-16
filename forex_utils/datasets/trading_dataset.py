@@ -47,6 +47,17 @@ class TradingDataset:
         for data_inst in data[1:]:
             self.data = self.data.join(data_inst, how='inner')
         
+        # Get columns indices for (much) faster indexing
+        self.xcols_i = [i for i, c in enumerate(self.data.columns) if c in self.xcols]
+        self.ycols_i = [i for i, c in enumerate(self.data.columns) if c in self.ycols]
+        self.xcols = self.data.columns[self.xcols_i]
+        self.ycols = self.data.columns[self.ycols_i]
+        self.data = pd.DataFrame(
+            self.data.values.copy(),
+            columns=self.data.columns,
+            index=self.data.index.values
+        )
+        
         # Get statistics for normalisation
         self.means, self.stds, self.covs = self.get_stats()
 
@@ -55,13 +66,13 @@ class TradingDataset:
     
     def __getitem__(self, i):
         x, y = self.get_raw(i)
-
+        
         if self.norm_x:
             x = x - x.mean()
-            x = x / self.stds[self.xcols]
+            x = x / self.stds.values[self.xcols_i]
         if self.norm_y:
             y = y - y.iloc[0]
-            y = y / self.stds[self.ycols]
+            y = y / self.stds.values[self.ycols_i]
 
         if self.transform is not None:
             x = self.transform(x)
@@ -73,8 +84,10 @@ class TradingDataset:
     def get_raw(self, i):
         win_start, win_end = i, i + self.window
         hor_start, hor_end = win_end, win_end + self.horizon
-        x = self.data[self.xcols].iloc[win_start:win_end]
-        y = self.data[self.ycols].iloc[hor_start:hor_end]
+        x = self.data.values[win_start:win_end, self.xcols_i]
+        y = self.data.values[hor_start:hor_end, self.ycols_i]
+        x = pd.DataFrame(x, columns=self.xcols, index=self.data.index.values[win_start:win_end])
+        y = pd.DataFrame(y, columns=self.ycols, index=self.data.index.values[hor_start:hor_end])
 
         return x.copy(), y.copy()
     
@@ -84,7 +97,7 @@ class TradingDataset:
         covs = means.abs() / stds
         return means, stds, covs
     
-    def show_sample(self, i=None):
+    def show_sample(self, i=None, shared_yaxes=True):
         if not i:
             i = np.random.choice(len(self))
 
@@ -95,17 +108,16 @@ class TradingDataset:
             _, y = self.get_raw(i)
             if self.norm_x:
                 y = y - y.iloc[0]
-                y = y / self.stds[self.ycols]
+                y = y / self.stds.values[self.ycols_i]
         else:
             ylabels = None
-
         
         fig = make_subplots(
             1, 2,
             column_widths=[len(x), len(y)],
             subplot_titles=['X', 'Y'],
-            shared_yaxes=True,
-            horizontal_spacing=0.02
+            shared_yaxes=shared_yaxes,
+            horizontal_spacing=0.05
         )
         colours = {c: colour for c, colour in zip(x.columns, default_colours.Plotly)}
         for c in x.columns:
@@ -119,7 +131,8 @@ class TradingDataset:
         for c in y.columns:
             yc, colour, showlegend = y[c], None, None
             if c in x.columns:
-                yc = yc - yc[0] + x[c][-1]
+                if shared_yaxes:
+                    yc = yc - yc[0] + x[c][-1]
                 colour = colours[c]
                 showlegend = False
             
@@ -137,13 +150,10 @@ class TradingDataset:
                 fig.add_annotation(
                     x=y.index[-1], y=yc[-1],
                     yshift=20,
-                    text=str(ylabels[c]),
+                    text=str(ylabels[c].squeeze()),
                     showarrow=False,
                     font=dict(size=18, color=colour),
                     row=1, col=2
                 )
         
-        fig.show()
-        
-
-
+        return fig
