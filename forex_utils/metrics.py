@@ -55,7 +55,7 @@ class SharpeRatio(nn.Module):
         self.dim = dim
 
     def forward(self, y_pred, change):
-        exposure, position = y_pred
+        position = y_pred
         sharpe, profit = sharpe_ratio(
             exposure,
             position,
