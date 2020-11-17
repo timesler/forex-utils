@@ -57,7 +57,6 @@ class SharpeRatio(nn.Module):
     def forward(self, y_pred, change):
         position = y_pred
         sharpe, profit = sharpe_ratio(
-            exposure,
             position,
             change,
             min_lot=self.min_lot,
