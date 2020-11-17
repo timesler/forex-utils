@@ -156,7 +156,6 @@ def position_profit(position, change, min_lot=0.0, lot_size=100000, spread=0.000
     position = exposure - lagged_exposure
     spread_factor = spread_cost(exposure, lagged_exposure, position)
     profit = (change * exposure - spread * spread_factor) * lot_size
-    print(profit.sum())
     return profit
 
 
