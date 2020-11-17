@@ -137,13 +137,14 @@ class Cost(nn.Module):
 class Wins(nn.Module):
     def __init__(self, spread=0.0001, lot_size=100000, min_lot=0.0, dim=2):
         super().__init__()
+        self.dim = dim
         self.profit = Profit(
-            spread=spread, lot_size=lot_size, min_lot=min_lot, reduce=True, is_loss=False, dim=dim
+            spread=spread, lot_size=lot_size, min_lot=min_lot, reduce=False, is_loss=False, dim=dim
         )
 
     def forward(self, y_pred, change):
-        profit = self.profit(y_pred, change)
-        return (profit >= 0).float()
+        profit = self.profit(y_pred, change).mean(dim=self.dim)
+        return (profit >= 0).float().mean()
 
 
 @lru_cache(8)
