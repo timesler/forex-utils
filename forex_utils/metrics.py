@@ -164,7 +164,7 @@ def sharpe_ratio(
     position, change, min_lot=0.0, lot_size=100000, spread=0.0001, return_profit=False, dim=2
 ):
     profit = position_profit(position, change, min_lot=min_lot, lot_size=lot_size, spread=spread)
-    sharpe_r = profit / profit.std(dim=dim)
+    sharpe_r = profit / profit.std(dim=dim, keepdims=True)
     if return_profit:
         return sharpe_r, profit
     return sharpe_r
