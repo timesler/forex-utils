@@ -56,6 +56,7 @@ class SharpeRatio(nn.Module):
 
     def forward(self, y_pred, change):
         position = y_pred
+        exposure = position.cumsum(dim=self.dim)
         sharpe, profit = sharpe_ratio(
             position,
             change,
